@@ -1,10 +1,15 @@
 import { Chess } from 'chess.js'
 import { analyseCached } from './engine'
 import { gameAccuracy, moveAccuracy, winFor, winPct } from './accuracy'
-import { explain, isSacrifice, numbered, pvToSan, uciToSan } from './explain'
+import { explain, isSacrifice, numbered, phaseOf, pvToSan, uciToSan } from './explain'
 import { detectOpening } from './openings'
 import { db } from './db'
-import type { Cls, Color, Game, GameAnalysis, MoveAnalysis, Phase, PosEval, Puzzle, Score } from './types'
+import type { Cls, Color, Game, GameAnalysis, MoveAnalysis, PosEval, Puzzle, Score } from './types'
+
+/** Bump when classification or explanations change; older analyses get redone (mostly from cache). */
+export const ANALYSIS_VERSION = 2
+
+export const isCurrent = (g: Game) => g.analysis?.version === ANALYSIS_VERSION
 
 export const CLS_INFO: Record<Cls, { label: string; glyph: string; color: string }> = {
   brilliant: { label: 'Brilliant', glyph: '!!', color: '#1baca6' },
@@ -21,15 +26,8 @@ export const CLS_INFO: Record<Cls, { label: string; glyph: string; color: string
 }
 
 export const BAD: Cls[] = ['inaccuracy', 'mistake', 'miss', 'blunder']
+export { phaseOf }
 export const PUZZLE_CLS: Cls[] = ['mistake', 'miss', 'blunder']
-
-export function phaseOf(fen: string): Phase {
-  const [board, , , , , full] = fen.split(' ')
-  const pieces = board.replace(/[^nbrqNBRQ]/g, '').length
-  if (pieces <= 6) return 'endgame'
-  if (+full <= 10 && pieces >= 12) return 'opening'
-  return 'middlegame'
-}
 
 /** Classify a move from the mover's win % before (best play) and after. */
 export function classify(drop: number): Cls {
@@ -140,6 +138,7 @@ export async function analyseGame(game: Game, depth: number, onProgress?: (done:
   })
 
   const analysis: GameAnalysis = {
+    version: ANALYSIS_VERSION,
     depth,
     startEval: score(0),
     moves: out,
@@ -177,8 +176,14 @@ async function makePuzzles(game: Game, a: GameAnalysis) {
       attempts: 0,
       solves: 0,
     }))
-  const existing = new Set((await db.puzzles.bulkGet(ps.map((p) => p.id))).filter(Boolean).map((p) => p!.id))
-  await db.puzzles.bulkAdd(ps.filter((p) => !existing.has(p.id)))
+  const old = await db.puzzles.bulkGet(ps.map((p) => p.id))
+  // Keep spaced-repetition progress on puzzles that already exist; refresh their text.
+  await db.puzzles.bulkPut(
+    ps.map((p, i) => {
+      const o = old[i]
+      return o ? { ...p, box: o.box, due: o.due, attempts: o.attempts, solves: o.solves, createdAt: o.createdAt } : p
+    }),
+  )
 }
 
 export { numbered }

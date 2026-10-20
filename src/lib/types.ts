@@ -42,6 +42,12 @@ export type Tag =
   | 'bad-trade'
   | 'allowed-tactic'
   | 'missed-tactic'
+  | 'ignored-threat'
+  | 'allowed-pin'
+  | 'missed-pin'
+  | 'king-safety'
+  | 'opening-principle'
+  | 'endgame-technique'
   | 'positional'
 
 export interface MoveAnalysis {
@@ -65,6 +71,7 @@ export interface MoveAnalysis {
 }
 
 export interface GameAnalysis {
+  version?: number
   depth: number
   startEval: Score
   moves: MoveAnalysis[]

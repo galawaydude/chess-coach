@@ -1,5 +1,5 @@
 import { db, getMeta, setMeta } from './db'
-import { analyseGame } from './analysis'
+import { analyseGame, isCurrent } from './analysis'
 
 // ---- routing (hash based, so the app works from any static host) ----
 
@@ -24,6 +24,7 @@ export const settings = $state({ username: '', depth: 14, loaded: false })
   settings.username = await getMeta('username', '')
   settings.depth = await getMeta('depth', 14)
   settings.loaded = true
+  refreshOutdated()
 })()
 
 export function saveSetting(key: 'username' | 'depth', value: string | number) {
@@ -32,6 +33,12 @@ export function saveSetting(key: 'username' | 'depth', value: string | number) {
 }
 
 // ---- analysis queue ----
+
+/** Games analysed by an older version get their explanations refreshed in the background. */
+export async function refreshOutdated() {
+  const ids = (await db.games.toArray()).filter((g) => g.analysis && !isCurrent(g)).map((g) => g.id)
+  if (ids.length) enqueue(...ids)
+}
 
 export const queue = $state({
   ids: [] as string[],
@@ -63,7 +70,8 @@ async function run() {
     queue.done = 0
     queue.total = 0
     try {
-      await analyseGame(game, settings.depth, (d, t) => {
+      const depth = game.analysis && !isCurrent(game) ? game.analysis.depth : settings.depth
+      await analyseGame(game, depth, (d, t) => {
         queue.done = d
         queue.total = t
       })

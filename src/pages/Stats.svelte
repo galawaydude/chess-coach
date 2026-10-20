@@ -81,6 +81,12 @@
     'missed-fork': { label: 'Missed a fork', tip: 'Look for squares where one piece attacks two enemy pieces.' },
     'allowed-tactic': { label: 'Allowed a tactic', tip: 'Before you move, list every check, capture and threat your opponent will have.' },
     'missed-tactic': { label: 'Missed a tactic', tip: 'Every move, scan for checks, captures and threats you can make. In that order.' },
+    'ignored-threat': { label: 'Ignored a threat', tip: 'After every opponent move, ask: what is that move attacking?' },
+    'allowed-pin': { label: 'Got pinned or skewered', tip: 'Avoid lining up your king or queen with other pieces on lines the enemy bishops, rooks and queen can reach.' },
+    'missed-pin': { label: 'Missed a pin or skewer', tip: 'Look for enemy pieces lined up with their king or queen. Your bishops and rooks love that.' },
+    'king-safety': { label: 'King safety', tip: 'Castle early, and don\u2019t push the pawns in front of your castled king.' },
+    'opening-principle': { label: 'Opening principles', tip: 'In the first 10 moves: knights and bishops out, control the centre, castle. Don\u2019t move the queen or the same piece twice.' },
+    'endgame-technique': { label: 'Endgame technique', tip: 'In endgames: activate your king, push passed pawns, and stop your opponent\u2019s.' },
     'bad-trade': { label: 'Bad trade', tip: 'Count: what you take vs what you lose. A queen is worth 9 pawns.' },
     positional: { label: 'Weaker plan / slow move', tip: 'Develop pieces, castle early, and control the centre.' },
   }
