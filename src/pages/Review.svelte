@@ -92,8 +92,15 @@
   })
 
   let listEl: HTMLDivElement | undefined = $state()
+  // Keep the current move visible by scrolling only the move list.
+  // (scrollIntoView would also scroll the page, which jumps the board around.)
   $effect(() => {
-    listEl?.querySelector(`[data-ply="${ply}"]`)?.scrollIntoView({ block: 'nearest' })
+    const el = listEl?.querySelector<HTMLElement>(`[data-ply="${ply}"]`)
+    if (!listEl || !el) return
+    const top = el.offsetTop // .moves is position: relative, so this is relative to the list
+    if (top < listEl.scrollTop) listEl.scrollTop = top
+    else if (top + el.offsetHeight > listEl.scrollTop + listEl.clientHeight)
+      listEl.scrollTop = top + el.offsetHeight - listEl.clientHeight
   })
 
   const players = $derived(
@@ -370,6 +377,7 @@
     font-size: 12px;
   }
   .moves {
+    position: relative;
     max-height: 280px;
     overflow: auto;
     padding: 2px;
