@@ -257,12 +257,12 @@
                 </div>
               {/if}
               <div class="row">
-                {#if BAD.includes(cur.cls)}
-                  <button class="btn primary" onclick={() => go(`/play?fen=${encodeURIComponent(cur!.fenBefore)}`)}>
+                {#if BAD.includes(cur.cls) && mine(cur.color)}
+                  <button class="btn primary" onclick={() => go(`/play?fen=${encodeURIComponent(cur!.fenBefore)}&color=${g.userColor}`)}>
                     🎯 Practice this position
                   </button>
                 {/if}
-                <button class="btn" onclick={() => go(`/play?fen=${encodeURIComponent(fen)}`)}>Play on from here</button>
+                <button class="btn" onclick={() => go(`/play?fen=${encodeURIComponent(fen)}&color=${g.userColor}`)}>Play on from here</button>
                 <label class="row"><input type="checkbox" bind:checked={showBest} /> Show best-move arrow</label>
               </div>
             {/if}

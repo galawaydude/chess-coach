@@ -3,7 +3,7 @@
   import Trainer from '../components/Trainer.svelte'
   import type { Color } from '../lib/types'
 
-  let { fen }: { fen: string } = $props()
+  let { fen, color }: { fen: string; color?: string | null } = $props()
 
   const valid = $derived.by(() => {
     try {
@@ -20,7 +20,7 @@
       <button class="btn" onclick={() => history.back()}>◀ Back</button>
       <span style="color:#e8f0f0">Play this position out against Stockfish. Every move you make gets graded.</span>
     </div>
-    <Trainer startFen={valid} userColor={valid.split(' ')[1] as Color} />
+    <Trainer startFen={valid} userColor={(color === 'w' || color === 'b' ? color : valid.split(' ')[1]) as Color} />
   </div>
 {:else}
   <section class="win"><div class="title">Bad position</div><div class="body">That position couldn't be loaded.</div></section>

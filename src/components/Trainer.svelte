@@ -90,6 +90,9 @@
   // Warm up the root so the first answer is graded instantly.
   // svelte-ignore state_referenced_locally
   evalOf(nodes[0])
+  // Starting on the opponent's turn: let the engine make their move first.
+  // svelte-ignore state_referenced_locally
+  if (!puzzle && new Chess(startFen).turn() !== userColor) engineReply(nodes[0])
 
   function addChild(parent: Node, uci: string, byEngine = false): Node {
     const existing = parent.children.map((i) => nodes[i]).find((c) => c.uci === uci)
@@ -218,6 +221,8 @@
       if (n.parent === null) break
       n = nodes[n.parent]
     } while (new Chess(n.fen).turn() !== userColor)
+    // Started on the opponent's turn: land on their first move instead of the empty start.
+    if (new Chess(n.fen).turn() !== userColor && n.children.length) n = nodes[n.children[0]]
     cur = n.id
     if (n.id === 0 && (phase === 'wrong' || phase === 'checking')) phase = 'solve'
   }

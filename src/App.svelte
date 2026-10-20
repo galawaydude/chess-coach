@@ -46,7 +46,7 @@
     {:else if page === 'coach'}
       <Coach />
     {:else if page === 'play'}
-      {#key route.query.toString()}<Play fen={route.query.get('fen') ?? ''} />{/key}
+      {#key route.query.toString()}<Play fen={route.query.get('fen') ?? ''} color={route.query.get('color')} />{/key}
     {:else if page === 'stats'}
       <Stats />
     {:else}
