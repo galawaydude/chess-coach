@@ -153,8 +153,8 @@
           <button class="btn" onclick={() => (flip = !flip)} title="Flip board (F)">⇅</button>
           <span class="grow"></span>
           {#if a}
-            <button class="btn" onclick={() => nextMistake(-1)} title="Your previous mistake">◀ ✗</button>
-            <button class="btn" onclick={() => nextMistake(1)} title="Your next mistake">✗ ▶</button>
+            <button class="btn" onclick={() => nextMistake(-1)} title="Jump to your previous mistake">◀ Prev mistake</button>
+            <button class="btn" onclick={() => nextMistake(1)} title="Jump to your next mistake">Next mistake ▶</button>
           {/if}
         </div>
       </div>
@@ -230,7 +230,7 @@
             {#if !cur}
               <p>Step through the game with ← → or click the graph. Red dots are the big swings.</p>
               {#if a.moves.some((m) => mine(m.color) && ['mistake', 'blunder', 'miss'].includes(m.cls))}
-                <button class="btn primary" onclick={() => nextMistake(1)}>Show my first mistake ✗ ▶</button>
+                <button class="btn primary" onclick={() => nextMistake(1)}>Show my first mistake ▶</button>
               {:else}
                 <p><b>No real mistakes from you this game. Nice!</b></p>
               {/if}
