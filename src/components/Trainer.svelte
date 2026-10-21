@@ -16,7 +16,8 @@
   import { analyseLive } from '../lib/engine'
   import { winFor } from '../lib/accuracy'
   import { classify, CLS_INFO } from '../lib/analysis'
-  import { explain, numbered, playUci, pvToSan } from '../lib/explain'
+  import { explain, playUci, ref, refLine } from '../lib/explain'
+  import ExplainText from './ExplainText.svelte'
   import type { Cls, Color, PosEval, Puzzle } from '../lib/types'
 
   interface Props {
@@ -129,8 +130,8 @@
         winAfter: after,
       }).text
     } else if (isBest) text = 'That’s the engine’s top move.'
-    else if (drop < 2) text = `Excellent, nearly as strong as the best move${best ? ` (${pvToSan(parent.fen, [best])[0]})` : ''}.`
-    else text = `Good enough. ${best ? pvToSan(parent.fen, [best])[0] : 'Another move'} was a little stronger.`
+    else if (drop < 2) text = `Excellent, nearly as strong as the best move${best ? ` (${ref('b', [best])})` : ''}.`
+    else text = `Good enough. ${best ? ref('b', [best]) : 'Another move'} was a little stronger.`
     child.grade = { cls, text, ok: drop < 5 }
     return child.grade
   }
@@ -231,6 +232,16 @@
   }
 
   // ---- board decorations ----
+
+  /** The move you actually played in the game, for puzzle explanations. */
+  const gamePlayed = $derived.by(() => {
+    if (!puzzle) return undefined
+    try {
+      return new Chess(puzzle.fen).move(puzzle.playedSan).lan
+    } catch {
+      return undefined
+    }
+  })
 
   const solving = $derived(!!puzzle && (phase === 'solve' || phase === 'wrong' || phase === 'checking'))
 
@@ -347,7 +358,7 @@
           {#if hint === 2}<p class="muted">The arrow shows the move.</p>{/if}
         {:else if phase === 'wrong' && feedback}
           <p class="big bad">✗ Not quite.</p>
-          <p>{feedback.text}</p>
+          <div class="para"><ExplainText text={feedback.text} fen={nodes[lastUserNode!.parent!].fen} played={lastUserNode!.uci} me={userColor} /></div>
           <div class="row">
             <button class="btn primary" onclick={retry}>↺ Try again</button>
             <button class="btn" onclick={() => { retry(); hint = Math.min(2, hint + 1) }}>💡 Hint</button>
@@ -360,15 +371,17 @@
             <p class="big">The answer was <b>{puzzle?.bestSan}</b>.</p>
           {/if}
           {#if puzzle && nearStart && (phase === 'solved' || phase === 'revealed')}
-            <p class="muted">
-              In the game you played <b>{puzzle.playedSan}</b>{puzzle.explanation ? `: ${puzzle.explanation}` : '.'}
-            </p>
+            <div class="para muted">
+              In the game you played <b>{puzzle.playedSan}</b>{#if puzzle.explanation}:
+                <ExplainText text={puzzle.explanation} fen={puzzle.fen} played={gamePlayed} me={userColor} />{:else}.{/if}
+            </div>
           {/if}
           {#if feedback && !(puzzle && nearStart)}
-            <p>
+            <div class="para">
               <span class="glyph" style:background={CLS_INFO[feedback.cls].color}>{CLS_INFO[feedback.cls].glyph}</span>
-              <b>{lastUserNode?.san}</b>: {feedback.text}
-            </p>
+              <b>{lastUserNode?.san}</b>:
+              <ExplainText text={feedback.text} fen={nodes[lastUserNode!.parent!].fen} played={lastUserNode!.uci} me={userColor} />
+            </div>
           {:else if !feedback && !puzzle}
             <p>Play a move. The engine answers as your opponent and grades every move you make.</p>
           {/if}
@@ -400,7 +413,7 @@
         {/each}
       </div>
       {#if node.eval?.lines[0] && phase !== 'solve' && phase !== 'wrong' && !over}
-        <div class="pv muted">Engine: {numbered(node.fen, pvToSan(node.fen, node.eval.lines[0].pv, 6))}</div>
+        <div class="pv muted">Engine: <ExplainText text={refLine('b', node.fen, node.eval.lines[0].pv, 6)} fen={node.fen} me={userColor} /></div>
       {/if}
     </section>
   </div>
@@ -425,7 +438,8 @@
   .controls {
     margin-top: 8px;
   }
-  .coach p {
+  .coach p,
+  .coach .para {
     margin: 0;
     font-size: 14px;
   }

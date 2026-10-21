@@ -7,7 +7,7 @@ import { db } from './db'
 import type { Cls, Color, Game, GameAnalysis, MoveAnalysis, PosEval, Puzzle, Score } from './types'
 
 /** Bump when classification or explanations change; older analyses get redone (mostly from cache). */
-export const ANALYSIS_VERSION = 3
+export const ANALYSIS_VERSION = 4
 
 export const isCurrent = (g: Game) => g.analysis?.version === ANALYSIS_VERSION
 

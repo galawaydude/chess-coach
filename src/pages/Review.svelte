@@ -9,7 +9,8 @@
   import { live } from '../lib/live.svelte'
   import { parseGame, CLS_INFO, BAD } from '../lib/analysis'
   import { enqueue, queue, go, arrowPrefs } from '../lib/state.svelte'
-  import { numbered } from '../lib/explain'
+  import { sanLineRefs } from '../lib/explain'
+  import ExplainText from '../components/ExplainText.svelte'
   import type { Cls, Color, Game } from '../lib/types'
 
   let { id }: { id: string } = $props()
@@ -244,7 +245,7 @@
               {/if}
             {:else}
               {#if cur.explanation}
-                <p>{cur.explanation}</p>
+                <div class="para"><ExplainText text={cur.explanation} fen={cur.fenBefore} played={cur.uci} me={g.userColor} /></div>
               {:else if cur.cls === 'brilliant'}
                 <p>A sacrifice that works! The engine agrees this was the best move.</p>
               {:else if cur.cls === 'great'}
@@ -261,7 +262,7 @@
               {#if cur.bestUci !== cur.uci && cur.bestLine.length && !['book', 'forced'].includes(cur.cls)}
                 <div class="line sunken">
                   <span class="muted">Best line:</span>
-                  {numbered(cur.fenBefore, cur.bestLine)}
+                  <ExplainText text={sanLineRefs(cur.fenBefore, cur.bestLine)} fen={cur.fenBefore} me={g.userColor} />
                 </div>
               {/if}
               <div class="row">
@@ -374,7 +375,8 @@
     border-bottom: 1px solid var(--lo);
     font-size: 15px;
   }
-  .coach p {
+  .coach p,
+  .coach .para {
     margin: 0;
     font-size: 14px;
   }

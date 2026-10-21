@@ -18,9 +18,10 @@
     movable?: 'white' | 'black' | 'both'
     shapes?: DrawShape[]
     onMove?: (uci: string) => void
+    coordinates?: boolean
   }
 
-  let { fen, orientation = 'white', lastMove, movable, shapes = [], onMove }: Props = $props()
+  let { fen, orientation = 'white', lastMove, movable, shapes = [], onMove, coordinates = true }: Props = $props()
 
   let el: HTMLDivElement
   let cg: Api | undefined
@@ -58,6 +59,7 @@
     cg = untrack(() => Chessground(el, {
       ...config(),
       animation: { enabled: true, duration: 160 },
+      coordinates,
       highlight: { lastMove: true, check: true },
       drawable: { autoShapes: shapes, brushes: brushes as never },
       premovable: { enabled: false },

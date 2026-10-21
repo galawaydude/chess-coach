@@ -56,6 +56,71 @@ export function numbered(fen: string, sans: string[]): string {
   return parts.join(' ')
 }
 
+// ---- clickable move references ----
+// Explanations embed moves as ⟦ctx:uci,uci,...⟧: the last move of that sequence,
+// played from the position before your move (b) or after it (a). The UI turns
+// them into chips that show the move on a mini board.
+
+export type RefCtx = 'a' | 'b'
+export const REF_RE = /⟦([ab]):([a-h1-8qrbn,]+)⟧/g
+
+export function ref(ctx: RefCtx, ucis: string[]): string {
+  return ucis.length && ucis[ucis.length - 1] ? `⟦${ctx}:${ucis.join(',')}⟧` : ''
+}
+
+/** A numbered line ("14. Nf3 Bg4 15. h3") where every move is a reference. */
+export function refLine(ctx: RefCtx, fen: string, pv: string[], max = 99): string {
+  const n = pvToSan(fen, pv, max).length
+  let [, turn, , , , full] = fen.split(' ')
+  let num = +full
+  let white = turn === 'w'
+  const parts: string[] = []
+  for (let i = 0; i < n; i++) {
+    const r = ref(ctx, pv.slice(0, i + 1))
+    if (white) parts.push(`${num}. ${r}`)
+    else parts.push(i === 0 ? `${num}... ${r}` : r)
+    if (!white) num++
+    white = !white
+  }
+  return parts.join(' ')
+}
+
+/** Same as refLine, from a line stored as SAN. */
+export function sanLineRefs(fen: string, sans: string[]): string {
+  const c = new Chess(fen)
+  const ucis: string[] = []
+  for (const s of sans) {
+    try {
+      ucis.push(c.move(s).lan)
+    } catch {
+      break
+    }
+  }
+  return refLine('b', fen, ucis)
+}
+
+/** Resolve the position a reference starts from. */
+export function refStart(ctx: RefCtx, fenBefore: string, played?: string): string | null {
+  if (ctx === 'b') return fenBefore
+  if (!played) return null
+  try {
+    const c = new Chess(fenBefore)
+    playUci(c, played)
+    return c.fen()
+  } catch {
+    return null
+  }
+}
+
+/** Explanation with references turned back into plain SAN. */
+export function plainText(text: string, fenBefore: string, played?: string): string {
+  return text.replace(REF_RE, (_, ctx: RefCtx, list: string) => {
+    const start = refStart(ctx, fenBefore, played)
+    const ucis = list.split(',')
+    return (start && pvToSan(start, ucis).at(-1)) || ucis.at(-1)!
+  })
+}
+
 const opp = (c: Color): Color => (c === 'w' ? 'b' : 'w')
 
 /** Can this piece be won: attacked and either undefended or attacked by something cheaper? */
@@ -281,8 +346,8 @@ export interface ExplainInput {
 export function explain(x: ExplainInput): { text: string; tag: Tag } {
   const before = new Chess(x.fenBefore)
   const c = before.turn()
-  const bestSan = x.best.length ? uciToSan(x.fenBefore, x.best[0]) : ''
-  const bestLine = numbered(x.fenBefore, pvToSan(x.fenBefore, x.best, 5))
+  const bestSan = x.best.length ? ref('b', [x.best[0]]) : ''
+  const bestLine = refLine('b', x.fenBefore, x.best, 5)
   const better = bestSan ? ` Better was ${bestSan}.` : ''
   const phase = phaseOf(x.fenBefore)
   const fullmove = +x.fenBefore.split(' ')[5]
@@ -290,7 +355,9 @@ export function explain(x: ExplainInput): { text: string; tag: Tag } {
   const after = new Chess(x.fenBefore)
   const m = playUci(after, x.played)
   const fenAfter = after.fen()
-  const replyLine = numbered(fenAfter, pvToSan(fenAfter, x.reply, 5))
+  const replyLine = refLine('a', fenAfter, x.reply, 5)
+  const rmS = ref('a', x.reply.slice(0, 1))
+  const mS = ref('b', [x.played])
 
   let bm: Move | null = null
   const b = new Chess(x.fenBefore)
@@ -334,22 +401,22 @@ export function explain(x: ExplainInput): { text: string; tag: Tag } {
       if (sq === m.to && m.captured && VAL[m.captured] < VAL[m.piece]) {
         return {
           tag: 'bad-trade',
-          text: `You took a ${NAME[m.captured]} with your ${NAME[m.piece]}, but ${rm.san} wins the ${NAME[m.piece]} back. That trade loses material.${better}`,
+          text: `You took a ${NAME[m.captured]} with your ${NAME[m.piece]}, but ${rmS} wins the ${NAME[m.piece]} back. That trade loses material.${better}`,
         }
       }
       if (sq === m.to) {
         const guarded = after.attackers(sq, c).length > 0
         return {
           tag: 'hung-piece',
-          text: `Your ${lost} on ${sq} can be taken by the ${taker} (${rm.san})${guarded ? ', and the trade costs you material' : ' and nothing protects it'}.${better}`,
+          text: `Your ${lost} on ${sq} can be taken by the ${taker} (${rmS})${guarded ? ', and the trade costs you material' : ' and nothing protects it'}.${better}`,
         }
       }
       const wasHanging = isHanging(before, sq)
       return {
         tag: 'hung-piece',
         text: wasHanging
-          ? `Your ${lost} on ${sq} was under attack and you didn't deal with it. ${rm.san} takes it.${better}`
-          : `This move left your ${lost} on ${sq} unprotected. ${rm.san} wins it.${better}`,
+          ? `Your ${lost} on ${sq} was under attack and you didn't deal with it. ${rmS} takes it.${better}`
+          : `This move left your ${lost} on ${sq} unprotected. ${rmS} wins it.${better}`,
       }
     }
   }
@@ -358,7 +425,7 @@ export function explain(x: ExplainInput): { text: string; tag: Tag } {
     if (ts.length >= 2) {
       return {
         tag: 'allowed-fork',
-        text: `This walks into a fork: ${rm.san} attacks your ${both(ts)} at the same time.${better}`,
+        text: `This walks into a fork: ${rmS} attacks your ${both(ts)} at the same time.${better}`,
       }
     }
   }
@@ -422,7 +489,7 @@ export function explain(x: ExplainInput): { text: string; tag: Tag } {
       const piece = NAME[r.get(newly[0])!.type]
       return {
         tag: 'ignored-threat',
-        text: `After your move, ${rm.san} attacks your ${piece} on ${newly[0]}${newly.length > 1 ? ` and your ${NAME[r.get(newly[1])!.type]} on ${newly[1]}` : ''}, and you have to react instead of making progress.${better}`,
+        text: `After your move, ${rmS} attacks your ${piece} on ${newly[0]}${newly.length > 1 ? ` and your ${NAME[r.get(newly[1])!.type]} on ${newly[1]}` : ''}, and you have to react instead of making progress.${better}`,
       }
     }
     const la = lineAttack(r, rm.to)
@@ -431,8 +498,8 @@ export function explain(x: ExplainInput): { text: string; tag: Tag } {
         tag: 'allowed-pin',
         text:
           la.kind === 'pin'
-            ? `This allows ${rm.san}, pinning your ${NAME[la.front.type]} on ${la.front.sq} to your ${NAME[la.back.type]}${la.back.type === 'k' ? ' so it can’t move' : ''}.${better}`
-            : `This allows ${rm.san}, a skewer: your ${NAME[la.front.type]} has to move and the ${NAME[la.back.type]} behind it on ${la.back.sq} falls.${better}`,
+            ? `This allows ${rmS}, pinning your ${NAME[la.front.type]} on ${la.front.sq} to your ${NAME[la.back.type]}${la.back.type === 'k' ? ' so it can’t move' : ''}.${better}`
+            : `This allows ${rmS}, a skewer: your ${NAME[la.front.type]} has to move and the ${NAME[la.back.type]} behind it on ${la.back.sq} falls.${better}`,
       }
     }
   }
@@ -489,7 +556,7 @@ export function explain(x: ExplainInput): { text: string; tag: Tag } {
     if (m.piece === 'p' && 'abgh'.includes(m.from[0]) && bestDevelops) {
       return {
         tag: 'opening-principle',
-        text: `Edge pawn moves like ${m.san} don't help in the opening. ${bestSan} ${describeMove(x.fenBefore, x.best[0])}.`,
+        text: `Edge pawn moves like ${mS} don't help in the opening. ${bestSan} ${describeMove(x.fenBefore, x.best[0])}.`,
       }
     }
     if (bestDevelops && !HOME[c][m.piece]?.includes(m.from)) {
@@ -506,7 +573,7 @@ export function explain(x: ExplainInput): { text: string; tag: Tag } {
     if (rm?.piece === 'p' && isPassed(r, rm.to)) {
       return {
         tag: 'endgame-technique',
-        text: `Watch the passed pawn: after your move, ${rm.san} pushes it closer to becoming a queen. ${bestSan ? `${bestSan} deals with it better.` : ''}`.trim(),
+        text: `Watch the passed pawn: after your move, ${rmS} pushes it closer to becoming a queen. ${bestSan ? `${bestSan} deals with it better.` : ''}`.trim(),
       }
     }
     if (bm?.piece === 'p' && isPassed(b, bm.to)) {
@@ -527,7 +594,7 @@ export function explain(x: ExplainInput): { text: string; tag: Tag } {
   const replyDoes = rm && x.reply.length ? describeMove(fenAfter, x.reply[0]).replace(/\byour\b/g, 'their') : ''
   const parts = [
     does ? `${bestSan} was stronger: it ${does}.` : bestSan ? `${bestSan} was stronger.` : '',
-    replyDoes ? `After your move, your opponent plays ${rm!.san}, which ${replyDoes}.` : '',
+    replyDoes ? `After your move, your opponent plays ${rmS}, which ${replyDoes}.` : '',
     chances,
     bestLine ? `The engine's idea: ${bestLine}.` : '',
   ]
