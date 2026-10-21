@@ -32,6 +32,26 @@ export function saveSetting(key: 'username' | 'depth', value: string | number) {
   return setMeta(key, value)
 }
 
+// ---- arrow toggles (per browser, best effort) ----
+
+function loadArrows() {
+  const d = { played: true, best: true, alt: true, next: true, engine: true, spoiler: false }
+  try {
+    return { ...d, ...JSON.parse(localStorage.getItem('arrows') ?? '{}') }
+  } catch {
+    return d
+  }
+}
+export const arrowPrefs = $state<Record<string, boolean>>(loadArrows())
+$effect.root(() => {
+  $effect(() => {
+    const json = JSON.stringify(arrowPrefs)
+    try {
+      localStorage.setItem('arrows', json)
+    } catch {}
+  })
+})
+
 // ---- analysis queue ----
 
 /** Games analysed by an older version get their explanations refreshed in the background. */

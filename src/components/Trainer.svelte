@@ -10,6 +10,9 @@
   import type { Key } from 'chessground/types'
   import Board from './Board.svelte'
   import EvalBar from './EvalBar.svelte'
+  import ArrowLegend from './ArrowLegend.svelte'
+  import { arrow, badge, dedupe, ARROW } from '../lib/arrows'
+  import { arrowPrefs } from '../lib/state.svelte'
   import { analyseLive } from '../lib/engine'
   import { winFor } from '../lib/accuracy'
   import { classify, CLS_INFO } from '../lib/analysis'
@@ -229,29 +232,36 @@
 
   // ---- board decorations ----
 
+  const solving = $derived(!!puzzle && (phase === 'solve' || phase === 'wrong' || phase === 'checking'))
+
   const shapes = $derived.by(() => {
     const out: DrawShape[] = []
-    if (puzzle && cur === 0 && (phase === 'solve' || phase === 'wrong') && hint > 0) {
-      const b = puzzle.bestUci
-      out.push(hint === 1 ? { orig: b.slice(0, 2) as Key, brush: 'green' } : { orig: b.slice(0, 2) as Key, dest: b.slice(2, 4) as Key, brush: 'green' })
+    if (solving && cur === 0 && hint > 0) {
+      const b = puzzle!.bestUci
+      out.push(hint === 1 ? { orig: b.slice(0, 2) as Key, brush: 'best' } : arrow(b, 'best')[0])
     }
-    const g = node.grade
-    if (g && node.uci) {
-      const info = CLS_INFO[g.cls]
-      out.push({
-        orig: node.uci.slice(2, 4) as Key,
-        customSvg: {
-          html: `<circle cx="82" cy="18" r="17" fill="${info.color}" stroke="#fff" stroke-width="3"/><text x="82" y="25" font-size="${info.glyph.length > 1 ? 18 : 22}" text-anchor="middle" fill="#fff" font-weight="bold" font-family="Tahoma,sans-serif">${info.glyph}</text>`,
-        },
-      })
+    if (node.uci && node.byEngine) {
+      if (arrowPrefs.engine) out.push(...arrow(node.uci, 'engine'))
+    } else if (node.uci && node.grade) {
+      if (arrowPrefs.played) out.push(...arrow(node.uci, `cls-${node.grade.cls}`))
+      // What you should have played instead (kept hidden while you're still solving).
+      if (arrowPrefs.best && !solving && node.grade.cls !== 'best' && node.parent !== null) {
+        const p = nodes[node.parent]
+        out.push(...arrow(puzzle && p.id === 0 ? puzzle.bestUci : p.eval?.lines[0]?.pv[0], 'best'))
+      }
+      out.push(badge(node.uci, node.grade.cls))
     }
     // After a wrong try, point at what the opponent will do about it.
-    if (phase === 'wrong' && node.parent === 0 && node.eval?.lines[0]?.pv[0]) {
-      const r = node.eval.lines[0].pv[0]
-      out.push({ orig: r.slice(0, 2) as Key, dest: r.slice(2, 4) as Key, brush: 'red' })
-    }
-    return out
+    if (phase === 'wrong' && node.parent === 0) out.push(...arrow(node.eval?.lines[0]?.pv[0], 'next'))
+    if (arrowPrefs.spoiler && !solving && !over && turn === userColor) out.push(...arrow(node.eval?.lines[0]?.pv[0], 'alt'))
+    return dedupe(out)
   })
+  const legend = $derived([
+    { key: 'played', label: 'Your move', color: node.grade ? CLS_INFO[node.grade.cls].color : '#888' },
+    { key: 'best', label: 'Better move', color: ARROW.best },
+    { key: 'engine', label: "Engine's reply", color: ARROW.engine },
+    { key: 'spoiler', label: 'Show best move (spoiler)', color: ARROW.alt },
+  ])
 
   const canMove = $derived(
     !over && turn === userColor && phase !== 'checking' && !(phase === 'wrong' && cur !== 0) && !(phase === 'solve' && cur !== 0),
@@ -318,6 +328,7 @@
         <span class="grow"></span>
         <span class="muted">{status}</span>
       </div>
+      <ArrowLegend items={legend} prefs={arrowPrefs} />
     </div>
   </section>
 

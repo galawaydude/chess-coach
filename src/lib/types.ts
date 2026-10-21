@@ -59,6 +59,7 @@ export interface MoveAnalysis {
   fenAfter: string
   evalAfter: Score // white POV, after the move
   bestUci: string
+  secondUci?: string // engine's second choice
   bestSan: string
   bestLine: string[] // SAN, starting with the best move
   winBefore: number // mover's win %, with best play

@@ -4,3 +4,4 @@ public/engine
 public/openings.json
 *.local
 .DS_Store
+.dev

@@ -7,7 +7,7 @@ import { db } from './db'
 import type { Cls, Color, Game, GameAnalysis, MoveAnalysis, PosEval, Puzzle, Score } from './types'
 
 /** Bump when classification or explanations change; older analyses get redone (mostly from cache). */
-export const ANALYSIS_VERSION = 2
+export const ANALYSIS_VERSION = 3
 
 export const isCurrent = (g: Game) => g.analysis?.version === ANALYSIS_VERSION
 
@@ -102,6 +102,7 @@ export async function analyseGame(game: Game, depth: number, onProgress?: (done:
       fenAfter: m.after,
       evalAfter: score(i + 1),
       bestUci,
+      secondUci: evB.lines[1]?.pv[0],
       bestSan: uciToSan(m.before, bestUci),
       bestLine: pvToSan(m.before, best?.pv ?? [], 6),
       winBefore,

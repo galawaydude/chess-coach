@@ -5,6 +5,7 @@
   import type { Key } from 'chessground/types'
   import { Chess, SQUARES } from 'chess.js'
   import { untrack } from 'svelte'
+  import { brushes } from '../lib/arrows'
   import 'chessground/assets/chessground.base.css'
   import 'chessground/assets/chessground.brown.css'
   import 'chessground/assets/chessground.cburnett.css'
@@ -58,6 +59,7 @@
       ...config(),
       animation: { enabled: true, duration: 160 },
       highlight: { lastMove: true, check: true },
+      drawable: { autoShapes: shapes, brushes: brushes as never },
       premovable: { enabled: false },
       draggable: { showGhost: true },
       events: {

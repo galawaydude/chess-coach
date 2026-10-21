@@ -7,7 +7,8 @@ A personal chess coach for your chess.com games. It runs entirely in your browse
 **Game review**
 - Accuracy for both players (Lichess's published formula; chess.com's is closed, so numbers differ a bit)
 - Every move rated: Brilliant, Great, Best, Excellent, Good, Book, Inaccuracy, Mistake, Miss, Blunder
-- Eval graph (click to jump), eval bar, best-move arrows, opening name from the Lichess opening book
+- Eval graph (click to jump), eval bar, opening name from the Lichess opening book
+- Coloured arrows you can toggle: the move played (coloured by rating), the best move, the 2nd best, and the best next move or threat
 - A plain-English reason for each bad move: hung a piece, walked into a fork, allowed a tactic or mate, missed a capture/fork/mate, bad trade
 - Jump straight to your next mistake, keyboard: `←` `→` `Home` `End` `F` (flip)
 

@@ -1,13 +1,14 @@
 <script lang="ts">
   import type { DrawShape } from 'chessground/draw'
-  import type { Key } from 'chessground/types'
   import Board from '../components/Board.svelte'
   import EvalBar from '../components/EvalBar.svelte'
   import EvalGraph from '../components/EvalGraph.svelte'
+  import ArrowLegend from '../components/ArrowLegend.svelte'
+  import { arrow, badge, dedupe, ARROW } from '../lib/arrows'
   import { db } from '../lib/db'
   import { live } from '../lib/live.svelte'
   import { parseGame, CLS_INFO, BAD } from '../lib/analysis'
-  import { enqueue, queue, go } from '../lib/state.svelte'
+  import { enqueue, queue, go, arrowPrefs } from '../lib/state.svelte'
   import { numbered } from '../lib/explain'
   import type { Cls, Color, Game } from '../lib/types'
 
@@ -23,7 +24,6 @@
   const a = $derived(g?.analysis)
   let ply = $state(-1)
   let flip = $state<boolean | null>(null)
-  let showBest = $state(true)
 
   $effect(() => {
     if (g && !g.analysis && queue.current !== g.id && !queue.ids.includes(g.id)) enqueue(g.id)
@@ -36,21 +36,31 @@
   const cur = $derived(ply >= 0 ? a?.moves[ply] : undefined)
   const mine = (c: Color) => c === g?.userColor
 
+  // Arrows: the move played (coloured by rating), what was better, the
+  // engine's second choice, and the best move from the position on the board.
   const shapes = $derived.by(() => {
     const out: DrawShape[] = []
-    if (!cur) return out
-    const info = CLS_INFO[cur.cls]
-    out.push({
-      orig: cur.uci.slice(2, 4) as Key,
-      customSvg: {
-        html: `<circle cx="82" cy="18" r="17" fill="${info.color}" stroke="#fff" stroke-width="3"/><text x="82" y="25" font-size="${info.glyph.length > 1 ? 18 : 22}" text-anchor="middle" fill="#fff" font-weight="bold" font-family="Tahoma,sans-serif">${info.glyph}</text>`,
-      },
-    })
-    if (showBest && cur.bestUci && cur.bestUci !== cur.uci && !['book', 'forced'].includes(cur.cls)) {
-      out.push({ orig: cur.bestUci.slice(0, 2) as Key, dest: cur.bestUci.slice(2, 4) as Key, brush: 'green' })
+    const next = a?.moves[ply + 1]
+    if (cur) {
+      const quiet = cur.cls === 'book' || cur.cls === 'forced'
+      if (arrowPrefs.played) out.push(...arrow(cur.uci, `cls-${cur.cls}`))
+      if (arrowPrefs.best && !quiet && cur.bestUci !== cur.uci) out.push(...arrow(cur.bestUci, 'best'))
+      if (arrowPrefs.alt && !quiet) out.push(...arrow(cur.secondUci, 'alt'))
+      out.push(badge(cur.uci, cur.cls))
     }
-    return out
+    if (arrowPrefs.next && next) out.push(...arrow(next.bestUci, 'next'))
+    return dedupe(out)
   })
+  const legend = $derived([
+    { key: 'played', label: 'Move played', color: cur ? CLS_INFO[cur.cls].color : '#888' },
+    { key: 'best', label: 'Best move', color: ARROW.best },
+    { key: 'alt', label: '2nd best', color: ARROW.alt },
+    {
+      key: 'next',
+      label: a?.moves[ply + 1] && !mine(a.moves[ply + 1].color) ? 'Their best reply (threat)' : 'Best next move',
+      color: ARROW.next,
+    },
+  ])
 
   function key(e: KeyboardEvent) {
     if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'SELECT') return
@@ -145,6 +155,7 @@
           </div>
         </div>
         {@render who(players!.bottom, players!.bottomC)}
+        {#if a}<ArrowLegend items={legend} prefs={arrowPrefs} />{/if}
         <div class="row controls">
           <button class="btn" onclick={() => (ply = -1)} title="Start (Home)">⏮</button>
           <button class="btn" onclick={() => (ply = Math.max(-1, ply - 1))} title="Back (←)">◀</button>
@@ -263,7 +274,6 @@
                   </button>
                 {/if}
                 <button class="btn" onclick={() => go(`/play?fen=${encodeURIComponent(fen)}&color=${g.userColor}`)}>Play on from here</button>
-                <label class="row"><input type="checkbox" bind:checked={showBest} /> Show best-move arrow</label>
               </div>
             {/if}
           </div>
