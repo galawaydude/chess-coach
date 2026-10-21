@@ -41,25 +41,22 @@
   const shapes = $derived.by(() => {
     const out: DrawShape[] = []
     const next = a?.moves[ply + 1]
-    if (cur) {
+    // Arrows only for your own moves; the opponent's moves just get their rating badge.
+    if (cur && mine(cur.color)) {
       const quiet = cur.cls === 'book' || cur.cls === 'forced'
       if (arrowPrefs.played) out.push(...arrow(cur.uci, `cls-${cur.cls}`))
       if (arrowPrefs.best && !quiet && cur.bestUci !== cur.uci) out.push(...arrow(cur.bestUci, 'best'))
       if (arrowPrefs.alt && !quiet) out.push(...arrow(cur.secondUci, 'alt'))
-      out.push(badge(cur.uci, cur.cls))
     }
-    if (arrowPrefs.next && next) out.push(...arrow(next.bestUci, 'next'))
+    if (cur) out.push(badge(cur.uci, cur.cls))
+    if (arrowPrefs.next && next && mine(next.color)) out.push(...arrow(next.bestUci, 'next'))
     return dedupe(out)
   })
   const legend = $derived([
     { key: 'played', label: 'Move played', color: cur ? CLS_INFO[cur.cls].color : '#888' },
     { key: 'best', label: 'Best move', color: ARROW.best },
     { key: 'alt', label: '2nd best', color: ARROW.alt },
-    {
-      key: 'next',
-      label: a?.moves[ply + 1] && !mine(a.moves[ply + 1].color) ? 'Their best reply (threat)' : 'Best next move',
-      color: ARROW.next,
-    },
+    { key: 'next', label: 'Your best move here', color: ARROW.next },
   ])
 
   function key(e: KeyboardEvent) {

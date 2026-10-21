@@ -240,9 +240,7 @@
       const b = puzzle!.bestUci
       out.push(hint === 1 ? { orig: b.slice(0, 2) as Key, brush: 'best' } : arrow(b, 'best')[0])
     }
-    if (node.uci && node.byEngine) {
-      if (arrowPrefs.engine) out.push(...arrow(node.uci, 'engine'))
-    } else if (node.uci && node.grade) {
+    if (node.uci && node.grade && !node.byEngine) {
       if (arrowPrefs.played) out.push(...arrow(node.uci, `cls-${node.grade.cls}`))
       // What you should have played instead (kept hidden while you're still solving).
       if (arrowPrefs.best && !solving && node.grade.cls !== 'best' && node.parent !== null) {
@@ -251,15 +249,12 @@
       }
       out.push(badge(node.uci, node.grade.cls))
     }
-    // After a wrong try, point at what the opponent will do about it.
-    if (phase === 'wrong' && node.parent === 0) out.push(...arrow(node.eval?.lines[0]?.pv[0], 'next'))
     if (arrowPrefs.spoiler && !solving && !over && turn === userColor) out.push(...arrow(node.eval?.lines[0]?.pv[0], 'alt'))
     return dedupe(out)
   })
   const legend = $derived([
     { key: 'played', label: 'Your move', color: node.grade ? CLS_INFO[node.grade.cls].color : '#888' },
     { key: 'best', label: 'Better move', color: ARROW.best },
-    { key: 'engine', label: "Engine's reply", color: ARROW.engine },
     { key: 'spoiler', label: 'Show best move (spoiler)', color: ARROW.alt },
   ])
 
