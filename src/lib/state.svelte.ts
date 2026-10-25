@@ -66,6 +66,7 @@ export const queue = $state({
   done: 0,
   total: 0,
   error: '',
+  failed: [] as string[],
 })
 
 let running = false
@@ -97,6 +98,7 @@ async function run() {
       })
     } catch (e) {
       queue.error = String(e)
+      queue.failed.push(id)
       console.error(e)
     }
   }

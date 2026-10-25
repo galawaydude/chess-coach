@@ -64,7 +64,7 @@ export async function syncGames(username: string, months = 3, onStatus?: (s: str
   const wanted = archives.slice(-months).reverse()
   let added = 0
   for (const url of wanted) {
-    if (done.has(url) && url !== current) continue
+    if (done.has(url)) continue
     onStatus?.(`Downloading ${url.split('/games/')[1]}…`)
     const { games } = await get<{ games: RawGame[] }>(url)
     const parsed = games.map((g) => toGame(g, user)).filter((g): g is Game => !!g)
@@ -78,7 +78,8 @@ export async function syncGames(username: string, months = 3, onStatus?: (s: str
     }
     await db.games.bulkAdd(fresh)
     added += fresh.length
-    done.add(url)
+    // The newest month keeps getting games, so it's re-fetched until a newer one exists.
+    if (url !== current) done.add(url)
   }
   await setMeta(`archives:${user}`, [...done])
   return { added, totalMonths: archives.length }

@@ -290,7 +290,10 @@ function list(xs: string[]) {
 }
 
 /** Plain-words description of what a move does for the side making it. */
-export function describeMove(fen: string, uci: string): string {
+export function describeMove(fen: string, uci: string, pov: 'mover' | 'opponent' = 'mover'): string {
+  // From the opponent's side: their pieces are "their", yours are "your".
+  const own = pov === 'mover' ? 'your' : 'their'
+  const foe = pov === 'mover' ? 'the' : 'your'
   const before = new Chess(fen)
   const c = before.turn()
   const after = new Chess(fen)
@@ -302,18 +305,18 @@ export function describeMove(fen: string, uci: string): string {
   }
   const out: string[] = []
   const phase = phaseOf(fen)
-  if (m.isKingsideCastle() || m.isQueensideCastle()) out.push('castles your king to safety')
-  else if (HOME[c][m.piece]?.includes(m.from)) out.push(`develops your ${NAME[m.piece]}`)
-  if (m.captured) out.push(`takes the ${NAME[m.captured]} on ${m.to}`)
+  if (m.isKingsideCastle() || m.isQueensideCastle()) out.push(`castles ${own} king to safety`)
+  else if (HOME[c][m.piece]?.includes(m.from)) out.push(`develops ${own} ${NAME[m.piece]}`)
+  if (m.captured) out.push(`takes ${foe} ${NAME[m.captured]} on ${m.to}`)
   if (after.isCheck()) out.push('gives check')
   if (m.piece === 'p' && ['d4', 'e4', 'd5', 'e5'].includes(m.to) && phase !== 'endgame') out.push('claims the centre')
-  if (m.piece === 'p' && isPassed(after, m.to)) out.push('pushes your passed pawn')
-  if (m.piece === 'k' && phase === 'endgame') out.push('brings your king into the game')
+  if (m.piece === 'p' && isPassed(after, m.to)) out.push(`pushes ${own} passed pawn`)
+  if (m.piece === 'k' && phase === 'endgame') out.push(`brings ${own} king into the game`)
   if (m.piece === 'r') {
     const file = m.to[0]
     let pawns = 0
     for (let r = 1; r <= 8; r++) if (after.get((file + r) as Square)?.type === 'p') pawns++
-    if (!pawns && m.from[0] !== file) out.push(`puts your rook on the open ${file}-file`)
+    if (!pawns && m.from[0] !== file) out.push(`puts ${own} rook on the open ${file}-file`)
   }
   // New attacks on things worth attacking.
   const hits: string[] = []
@@ -321,14 +324,14 @@ export function describeMove(fen: string, uci: string): string {
     for (const t of row) {
       if (!t || t.color === c || t.type === 'k') continue
       if (!after.attackers(t.square, c).includes(m.to) || before.attackers(t.square, c).length) continue
-      if (VAL[t.type] > VAL[m.piece] || isHanging(after, t.square)) hits.push(`the ${NAME[t.type]} on ${t.square}`)
+      if (VAL[t.type] > VAL[m.piece] || isHanging(after, t.square)) hits.push(`${foe} ${NAME[t.type]} on ${t.square}`)
     }
   }
   if (hits.length) out.push(`attacks ${list(hits.slice(0, 2))}`)
   // Pieces it rescues.
   const saved = hangingSquares(before, c).filter((sq) => sq !== m.from && !isHanging(after, sq))
-  if (saved.length) out.push(`protects your ${NAME[before.get(saved[0])!.type]} on ${saved[0]}`)
-  if (hangingSquares(before, c).includes(m.from) && !isHanging(after, m.to)) out.push(`moves your ${NAME[m.piece]} out of danger`)
+  if (saved.length) out.push(`protects ${own} ${NAME[before.get(saved[0])!.type]} on ${saved[0]}`)
+  if (hangingSquares(before, c).includes(m.from) && !isHanging(after, m.to)) out.push(`moves ${own} ${NAME[m.piece]} out of danger`)
   return list(out)
 }
 
@@ -532,7 +535,7 @@ export function explain(x: ExplainInput): { text: string; tag: Tag } {
         : `Walking your king around with this many pieces still on the board is dangerous.${better}`,
     }
   }
-  if (m.piece === 'p' && kingSq && phase !== 'endgame' && Math.abs(FILES.indexOf(m.from[0]) - FILES.indexOf(kingSq[0])) <= 1 && (c === 'w' ? kingSq[1] === '1' : kingSq[1] === '8') && 'abcfgh'.includes(m.from[0])) {
+  if (m.piece === 'p' && kingSq && phase !== 'endgame' && Math.abs(FILES.indexOf(m.from[0]) - FILES.indexOf(kingSq[0])) <= 1 && (c === 'w' ? kingSq[1] === '1' : kingSq[1] === '8') && 'abcgh'.includes(kingSq[0]) && 'abcfgh'.includes(m.from[0])) {
     return { tag: 'king-safety', text: `Pushing the pawns in front of your castled king opens lines for the enemy pieces to attack it.${better}` }
   }
 
@@ -591,7 +594,7 @@ export function explain(x: ExplainInput): { text: string; tag: Tag } {
 
   const chances = `Your winning chances went from ${Math.round(x.winBefore)}% to ${Math.round(x.winAfter)}%.`
   const does = bm ? describeMove(x.fenBefore, x.best[0]) : ''
-  const replyDoes = rm && x.reply.length ? describeMove(fenAfter, x.reply[0]).replace(/\byour\b/g, 'their') : ''
+  const replyDoes = rm && x.reply.length ? describeMove(fenAfter, x.reply[0], 'opponent') : ''
   const parts = [
     does ? `${bestSan} was stronger: it ${does}.` : bestSan ? `${bestSan} was stronger.` : '',
     replyDoes ? `After your move, your opponent plays ${rmS}, which ${replyDoes}.` : '',

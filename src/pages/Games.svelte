@@ -14,8 +14,12 @@
   let res = $state('all')
   let analysed = $state('all')
 
+  let seeded = false
   $effect(() => {
-    if (settings.loaded && !name) name = settings.username
+    if (settings.loaded && !seeded) {
+      seeded = true
+      name = settings.username
+    }
   })
 
   const games = live(

@@ -37,6 +37,7 @@ class Engine {
   private done: Promise<void> = Promise.resolve()
   private finish: () => void = () => {}
   private multipv = 1
+  private seq = 0
 
   constructor(url: string, threads = 1, hashMb = 16) {
     this.w = new Worker(url)
@@ -93,8 +94,14 @@ class Engine {
 
   async analyse(fen: string, depth: number, multipv: number, onInfo?: (e: PosEval) => void): Promise<PosEval> {
     await this.ready
-    if (this.job) this.send('stop')
-    await this.done
+    // Several callers can be waiting for the same search to stop; only the
+    // newest one gets to run, the rest are cancelled.
+    const my = ++this.seq
+    while (this.job) {
+      this.send('stop')
+      await this.done
+    }
+    if (my !== this.seq) throw new Error('cancelled')
     return new Promise((resolve, reject) => {
       this.job = { fen, depth, multipv, onInfo, resolve, reject }
       this.lines = []
@@ -190,7 +197,7 @@ export function analyseLive(fen: string, depth: number, multipv = 1, onInfo?: (e
 export async function analyseCached(fen: string, depth: number, multipv: number): Promise<PosEval> {
   const key = evalKey(fen)
   const hit = await db.evals.get(key)
-  if (hit && hit.depth >= depth && hit.lines.length >= multipv) return { ...hit, fen }
+  if (hit && hit.depth >= depth && hit.lines.length >= 1) return { ...hit, fen }
   const res = await pool.analyse(fen, depth, multipv)
   await db.evals.put({ key, depth: res.depth, lines: res.lines })
   return res

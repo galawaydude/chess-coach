@@ -39,7 +39,7 @@
     style:height="{height}px"
     preserveAspectRatio="none"
   >
-    {#each ticks as t (t)}
+    {#each ticks as t, i (i)}
       <line x1={PAD.l} x2={W - PAD.r} y1={py(t)} y2={py(t)} stroke="#d0d0d0" vector-effect="non-scaling-stroke" />
     {/each}
     <path {d} fill="none" stroke="#0a246a" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
@@ -47,7 +47,7 @@
       <line x1={px(hover)} x2={px(hover)} y1={PAD.t} y2={height - PAD.b} stroke="#808080" vector-effect="non-scaling-stroke" />
     {/if}
   </svg>
-  {#each ticks as t (t)}
+  {#each ticks as t, i (i)}
     <span class="tick" style:top="{py(t)}px">{format(t)}</span>
   {/each}
   {#if hover !== null}

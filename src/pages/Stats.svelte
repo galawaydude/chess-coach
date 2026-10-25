@@ -4,6 +4,8 @@
   import { live } from '../lib/live.svelte'
   import { settings, go } from '../lib/state.svelte'
   import { MASTERED_BOX } from '../lib/srs'
+  import { TAGS, patternsPrompt } from '../lib/coach'
+  import CopyPrompt from '../components/CopyPrompt.svelte'
   import type { Game, Phase, Puzzle, Tag } from '../lib/types'
 
   const data = live(
@@ -72,24 +74,6 @@
   )
   const maxPhase = $derived(Math.max(0.01, ...byPhase.map((b) => b.perGame)))
 
-  const TAGS: Record<Tag, { label: string; tip: string }> = {
-    'hung-piece': { label: 'Left a piece hanging', tip: 'Before every move ask: after this, what can my opponent capture?' },
-    'missed-capture': { label: 'Missed a free piece', tip: 'Every turn, look at what your opponent just left undefended.' },
-    'allowed-mate': { label: 'Walked into checkmate', tip: 'Check your king’s safety: which checks can they give next move?' },
-    'missed-mate': { label: 'Missed a checkmate', tip: 'Look at every check you have, every move. Checks first, then captures.' },
-    'allowed-fork': { label: 'Walked into a fork', tip: 'Watch out for knights and queens that can attack two of your pieces.' },
-    'missed-fork': { label: 'Missed a fork', tip: 'Look for squares where one piece attacks two enemy pieces.' },
-    'allowed-tactic': { label: 'Allowed a tactic', tip: 'Before you move, list every check, capture and threat your opponent will have.' },
-    'missed-tactic': { label: 'Missed a tactic', tip: 'Every move, scan for checks, captures and threats you can make. In that order.' },
-    'ignored-threat': { label: 'Ignored a threat', tip: 'After every opponent move, ask: what is that move attacking?' },
-    'allowed-pin': { label: 'Got pinned or skewered', tip: 'Avoid lining up your king or queen with other pieces on lines the enemy bishops, rooks and queen can reach.' },
-    'missed-pin': { label: 'Missed a pin or skewer', tip: 'Look for enemy pieces lined up with their king or queen. Your bishops and rooks love that.' },
-    'king-safety': { label: 'King safety', tip: 'Castle early, and don\u2019t push the pawns in front of your castled king.' },
-    'opening-principle': { label: 'Opening principles', tip: 'In the first 10 moves: knights and bishops out, control the centre, castle. Don\u2019t move the queen or the same piece twice.' },
-    'endgame-technique': { label: 'Endgame technique', tip: 'In endgames: activate your king, push passed pawns, and stop your opponent\u2019s.' },
-    'bad-trade': { label: 'Bad trade', tip: 'Count: what you take vs what you lose. A queen is worth 9 pawns.' },
-    positional: { label: 'Weaker plan / slow move', tip: 'Develop pieces, castle early, and control the centre.' },
-  }
   const byTag = $derived.by(() => {
     const c = new Map<Tag, number>()
     for (const m of myMoves) if (m.tag && BADS.includes(m.cls)) c.set(m.tag, (c.get(m.tag) ?? 0) + 1)
@@ -135,6 +119,19 @@
       {@render tile('Puzzles', `${mastered}/${puzzles.length}`, 'mastered')}
     </div>
 
+    {#if analysed.length}
+      <section class="win">
+        <div class="title">Get a training plan from Claude</div>
+        <div class="body stack">
+          <p class="muted small">
+            Copies a summary of all your analysed games (blunders, phases, openings, common mistakes) as a prompt.
+            Paste it into Claude or Claude Code for a personal plan to fix your opening, middlegame and endgame.
+          </p>
+          <CopyPrompt make={() => patternsPrompt(games, puzzles)} />
+        </div>
+      </section>
+    {/if}
+
     {#if !analysed.length}
       <section class="win">
         <div class="title">Not enough data</div>
@@ -153,7 +150,7 @@
         </section>
       {/if}
 
-      {#if ratingPoints.length > 1}
+      {#if classes.length}
         <section class="win">
           <div class="title">
             Rating
@@ -162,7 +159,9 @@
               {#each classes as c (c)}<option value={c}>{c}</option>{/each}
             </select>
           </div>
-          <div class="body"><LineChart points={ratingPoints} /></div>
+          <div class="body">
+            {#if ratingPoints.length > 1}<LineChart points={ratingPoints} />{:else}<p class="muted small">Not enough rated {activeTc} games yet.</p>{/if}
+          </div>
         </section>
       {/if}
 

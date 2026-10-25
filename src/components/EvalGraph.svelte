@@ -75,7 +75,7 @@
     {@const m = moves[hover - 1]}
     <div class="tip" style:left="{(hover / Math.max(1, pts.length - 1)) * 100}%">
       {#if m}
-        <b>{Math.floor(m.ply / 2) + 1}{m.color === 'w' ? '.' : '...'} {m.san}</b>
+        <b>{m.fenBefore.split(' ')[5]}{m.color === 'w' ? '.' : '...'} {m.san}</b>
         {formatScore(m.evalAfter)}
         {#if !['best', 'excellent', 'good', 'book', 'forced'].includes(m.cls)}
           <span style:color={CLS_INFO[m.cls].color}>· {CLS_INFO[m.cls].label}</span>

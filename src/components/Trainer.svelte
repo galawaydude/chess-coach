@@ -6,6 +6,7 @@
   // something else, which grows a new branch.
 
   import { Chess } from 'chess.js'
+  import { onDestroy } from 'svelte'
   import type { DrawShape } from 'chessground/draw'
   import type { Key } from 'chessground/types'
   import Board from './Board.svelte'
@@ -75,6 +76,8 @@
   // ---- engine, one request at a time ----
 
   let chain: Promise<unknown> = Promise.resolve()
+  let alive = true
+  onDestroy(() => (alive = false))
   function evalOf(n: Node): Promise<PosEval> {
     if (n.eval) return Promise.resolve(n.eval)
     const c = new Chess(n.fen)
@@ -84,6 +87,7 @@
       return Promise.resolve(n.eval)
     }
     const p = chain.then(async () => {
+      if (!alive) throw new Error('gone')
       if (!n.eval) n.eval = await analyseLive(n.fen, DEPTH, 1)
       return n.eval
     })
@@ -137,13 +141,14 @@
   }
 
   async function engineReply(n: Node) {
-    if (new Chess(n.fen).isGameOver()) return
+    if (!alive || new Chess(n.fen).isGameOver()) return
     thinking = true
     try {
       const e = await evalOf(n)
       const reply = e.lines[0]?.pv[0]
       if (!reply) return
       await new Promise((r) => setTimeout(r, 250))
+      if (!alive) return
       const child = addChild(n, reply, true)
       if (cur === n.id) cur = child.id
       evalOf(child)
@@ -162,7 +167,18 @@
     if (phase === 'solve' && parent.id === 0) {
       phase = 'checking'
       tries++
-      const g = await grade(parent, child)
+      let g
+      try {
+        g = await grade(parent, child)
+      } catch {
+        // Engine request cancelled: let the user try that move again.
+        if (alive) {
+          cur = 0
+          phase = 'solve'
+          tries--
+        }
+        return
+      }
       if (g.ok) {
         // The right answer becomes the main line; wrong tries stay as side branches.
         parent.children = [child.id, ...parent.children.filter((i) => i !== child.id)]
@@ -181,8 +197,13 @@
       return onMove(uci)
     }
     thinking = true
-    await grade(parent, child)
-    thinking = false
+    try {
+      await grade(parent, child)
+    } catch {
+      return
+    } finally {
+      thinking = false
+    }
     engineReply(child)
   }
 

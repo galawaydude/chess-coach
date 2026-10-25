@@ -11,6 +11,8 @@
   import { enqueue, queue, go, arrowPrefs } from '../lib/state.svelte'
   import { sanLineRefs } from '../lib/explain'
   import ExplainText from '../components/ExplainText.svelte'
+  import CopyPrompt from '../components/CopyPrompt.svelte'
+  import { narrate, phaseReport, isKeyMoment, gamePrompt, moveLabel, BAD_CLS } from '../lib/coach'
   import type { Cls, Color, Game } from '../lib/types'
 
   let { id }: { id: string } = $props()
@@ -27,7 +29,7 @@
   let flip = $state<boolean | null>(null)
 
   $effect(() => {
-    if (g && !g.analysis && queue.current !== g.id && !queue.ids.includes(g.id)) enqueue(g.id)
+    if (g && !g.analysis && queue.current !== g.id && !queue.ids.includes(g.id) && !queue.failed.includes(g.id)) enqueue(g.id)
   })
 
   const total = $derived(parsed?.moves.length ?? 0)
@@ -61,7 +63,10 @@
   ])
 
   function key(e: KeyboardEvent) {
-    if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'SELECT') return
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    const t = e.target as HTMLElement
+    const typing = (t?.tagName === 'INPUT' && (t as HTMLInputElement).type !== 'checkbox') || t?.tagName === 'SELECT' || t?.tagName === 'TEXTAREA' || t?.isContentEditable
+    if (typing) return
     if (e.key === 'ArrowLeft') ply = Math.max(-1, ply - 1)
     else if (e.key === 'ArrowRight') ply = Math.min(total - 1, ply + 1)
     else if (e.key === 'Home') ply = -1
@@ -79,6 +84,20 @@
       if (mine(m.color) && ['mistake', 'blunder', 'miss'].includes(m.cls)) return (ply = i)
     }
   }
+
+  // ---- walkthrough ----
+  let keyOnly = $state(false)
+  function walk(dir: 1 | -1) {
+    if (!a) return
+    if (!keyOnly) return (ply = Math.max(-1, Math.min(total - 1, ply + dir)))
+    for (let i = ply + dir; i >= 0 && i < a.moves.length; i += dir) {
+      if (isKeyMoment(a.moves[i], mine(a.moves[i].color))) return (ply = i)
+    }
+    if (dir === -1) ply = -1
+  }
+  const story = $derived(a && cur && g ? narrate(a.moves, cur.ply, g.userColor, a.opening?.name) : '')
+  const report = $derived(g?.analysis ? phaseReport(g) : [])
+  const myBad = $derived(a ? a.moves.filter((m) => mine(m.color) && BAD_CLS.includes(m.cls)) : [])
 
   const SUMMARY: Cls[] = ['brilliant', 'great', 'best', 'excellent', 'good', 'book', 'inaccuracy', 'mistake', 'miss', 'blunder']
   const counts = $derived.by(() => {
@@ -178,7 +197,8 @@
               <span>Stockfish is checking every move… {queue.done}/{queue.total} positions</span>
               <div class="progress sunken"><div style:width="{(queue.done / Math.max(1, queue.total)) * 100}%"></div></div>
             {:else}
-              <span>Waiting in the queue ({queue.ids.indexOf(g.id) + 1} ahead of it)…</span>
+              {@const ahead = queue.ids.indexOf(g.id) + (queue.current ? 1 : 0)}
+              <span>{queue.ids.includes(g.id) ? `Waiting in the queue (${ahead} game${ahead === 1 ? '' : 's'} ahead)…` : 'Waiting to analyse…'}</span>
             {/if}
           </div>
         </section>
@@ -229,49 +249,73 @@
           <div class="title">
             {#if cur}
               <span class="glyph" style:background={CLS_INFO[cur.cls].color}>{CLS_INFO[cur.cls].glyph}</span>
-              {Math.floor(cur.ply / 2) + 1}{cur.color === 'w' ? '.' : '...'} {cur.san} is {['inaccuracy', 'excellent'].includes(cur.cls) ? 'an' : 'a'}
+              {moveLabel(cur)} is {['inaccuracy', 'excellent'].includes(cur.cls) ? 'an' : 'a'}
               {CLS_INFO[cur.cls].label.toLowerCase()} move
             {:else}
-              Coach says
+              Game report
             {/if}
           </div>
           <div class="body stack coach">
             {#if !cur}
-              <p>Step through the game with ← → or click the graph. Red dots are the big swings.</p>
-              {#if a.moves.some((m) => mine(m.color) && ['mistake', 'blunder', 'miss'].includes(m.cls))}
-                <button class="btn primary" onclick={() => nextMistake(1)}>Show my first mistake ▶</button>
-              {:else}
-                <p><b>No real mistakes from you this game. Nice!</b></p>
+              <p>
+                You {g.result === 'win' ? 'won' : g.result === 'loss' ? 'lost' : 'drew'} this game with
+                <b>{a.accuracy[g.userColor].toFixed(1)}%</b> accuracy.
+                {#if myBad.length}You made {myBad.length} big mistake{myBad.length === 1 ? '' : 's'}:{:else}No big mistakes from you. Nice!{/if}
+              </p>
+              {#if myBad.length}
+                <div class="row jumps">
+                  {#each myBad as m (m.ply)}
+                    <button class="btn sm" onclick={() => (ply = m.ply)}>
+                      <span class="glyph" style:background={CLS_INFO[m.cls].color}>{CLS_INFO[m.cls].glyph}</span>
+                      {moveLabel(m)}
+                    </button>
+                  {/each}
+                </div>
               {/if}
+              <table class="phases">
+                <tbody>
+                  {#each report as r (r.phase)}
+                    <tr>
+                      <th>{r.phase}</th>
+                      <td class="num">{r.accuracy.toFixed(0)}%</td>
+                      <td>
+                        {#if r.bad.length}
+                          {#each r.bad as m (m.ply)}
+                            <button class="btn sm" onclick={() => (ply = m.ply)}>{moveLabel(m)}</button>
+                          {/each}
+                        {:else}<span class="muted">clean</span>{/if}
+                      </td>
+                    </tr>
+                    <tr class="tip"><td></td><td colspan="2">{r.bad.length ? '💡 ' : '✓ '}{r.tip}</td></tr>
+                  {/each}
+                </tbody>
+              </table>
+              <div class="row">
+                <button class="btn primary" onclick={() => walk(1)}>▶ Walk me through the game</button>
+                <label class="row"><input type="checkbox" bind:checked={keyOnly} /> Only key moments</label>
+              </div>
+              <CopyPrompt make={() => gamePrompt(g!)} />
             {:else}
-              {#if cur.explanation}
-                <div class="para"><ExplainText text={cur.explanation} fen={cur.fenBefore} played={cur.uci} me={g.userColor} /></div>
-              {:else if cur.cls === 'brilliant'}
-                <p>A sacrifice that works! The engine agrees this was the best move.</p>
-              {:else if cur.cls === 'great'}
-                <p>The only good move here. Everything else was clearly worse.</p>
-              {:else if cur.cls === 'best' || cur.cls === 'excellent'}
-                <p>{cur.cls === 'best' ? 'The engine’s top choice.' : 'Almost as good as the best move.'}</p>
-              {:else if cur.cls === 'book'}
-                <p>A normal opening move{a.opening ? ` (${a.opening.name})` : ''}.</p>
-              {:else if cur.cls === 'forced'}
-                <p>The only legal move.</p>
-              {:else}
-                <p>A decent move. {cur.bestSan} was slightly better.</p>
-              {/if}
-              {#if cur.bestUci !== cur.uci && cur.bestLine.length && !['book', 'forced'].includes(cur.cls)}
+              <div class="para"><ExplainText text={story} fen={cur.fenBefore} played={cur.uci} me={g.userColor} /></div>
+              {#if mine(cur.color) && cur.bestUci !== cur.uci && cur.bestLine.length && !['book', 'forced'].includes(cur.cls)}
                 <div class="line sunken">
                   <span class="muted">Best line:</span>
                   <ExplainText text={sanLineRefs(cur.fenBefore, cur.bestLine)} fen={cur.fenBefore} me={g.userColor} />
                 </div>
               {/if}
               <div class="row">
+                <button class="btn" onclick={() => walk(-1)}>◀ Back</button>
+                <button class="btn primary" onclick={() => walk(1)} disabled={ply >= total - 1}>Next ▶</button>
+                <label class="row"><input type="checkbox" bind:checked={keyOnly} /> Only key moments</label>
+              </div>
+              <div class="row">
                 {#if BAD.includes(cur.cls) && mine(cur.color)}
-                  <button class="btn primary" onclick={() => go(`/play?fen=${encodeURIComponent(cur!.fenBefore)}&color=${g.userColor}`)}>
+                  <button class="btn" onclick={() => go(`/play?fen=${encodeURIComponent(cur!.fenBefore)}&color=${g.userColor}`)}>
                     🎯 Practice this position
                   </button>
                 {/if}
                 <button class="btn" onclick={() => go(`/play?fen=${encodeURIComponent(fen)}&color=${g.userColor}`)}>Play on from here</button>
+                <button class="btn" onclick={() => (ply = -1)}>Game report</button>
               </div>
             {/if}
           </div>
@@ -379,6 +423,31 @@
   .coach .para {
     margin: 0;
     font-size: 14px;
+  }
+  .jumps {
+    gap: 4px;
+  }
+  .phases {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .phases th {
+    text-align: left;
+    text-transform: capitalize;
+    padding: 4px 6px 0 0;
+    width: 90px;
+  }
+  .phases td {
+    padding: 4px 6px 0 0;
+  }
+  .phases td .btn {
+    margin: 0 4px 4px 0;
+  }
+  .phases .tip td {
+    padding: 0 0 6px;
+    font-size: 12px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--lo);
   }
   .line {
     padding: 6px 8px;

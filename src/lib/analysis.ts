@@ -7,7 +7,7 @@ import { db } from './db'
 import type { Cls, Color, Game, GameAnalysis, MoveAnalysis, PosEval, Puzzle, Score } from './types'
 
 /** Bump when classification or explanations change; older analyses get redone (mostly from cache). */
-export const ANALYSIS_VERSION = 4
+export const ANALYSIS_VERSION = 5
 
 export const isCurrent = (g: Game) => g.analysis?.version === ANALYSIS_VERSION
 
@@ -89,7 +89,9 @@ export async function analyseGame(game: Game, depth: number, onProgress?: (done:
       const second = evB.lines[1]
       if (second && winBefore > 25 && winBefore < 95) {
         if (drop < 2 && winAfter >= 50 && isSacrifice(m.before, m.lan)) cls = 'brilliant'
-        else if (winBefore - winFor(second.score, c) >= 15) cls = 'great'
+        else if (winBefore - winFor(second.score, c) >= 15 && !(i > 0 && moves[i - 1].captured && moves[i - 1].to === m.to))
+          // (taking back a piece that was just captured is obvious, not "great")
+          cls = 'great'
       }
     } else cls = classify(drop)
 

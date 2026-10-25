@@ -20,12 +20,17 @@
   let streak = $state(0)
   let session = $state({ solved: 0, tried: 0 })
 
-  const now = Date.now()
+  let now = $state(Date.now())
+  $effect(() => {
+    const t = setInterval(() => (now = Date.now()), 30_000)
+    return () => clearInterval(t)
+  })
   const pool = $derived(puzzles.value.filter((p) => phaseFilter === 'all' || p.phase === phaseFilter))
   const due = $derived(pool.filter((p) => p.due <= now))
   const mastered = $derived(puzzles.value.filter((p) => p.box >= MASTERED_BOX).length)
 
   function pickNext() {
+    now = Date.now()
     const src = (mode === 'due' ? due : pool).filter((p) => !seen.includes(p.id) && p.id !== currentId)
     const ordered =
       mode === 'due'
@@ -44,6 +49,7 @@
   let frozen = $state<Puzzle | undefined>()
   $effect(() => {
     if (puzzle && puzzle.id !== frozen?.id) frozen = puzzle
+    else if (!currentId) frozen = undefined
   })
 
   let game = $state<Game | undefined>()
@@ -123,7 +129,7 @@
       <span class="glyph" style:background={CLS_INFO[frozen.cls].color}>{CLS_INFO[frozen.cls].glyph}</span>
       {#if game && opp}
         From your game vs <b>{opp.username}</b> ({opp.rating}) on {new Date(game.endTime).toLocaleDateString()} · move
-        {Math.floor(frozen.ply / 2) + 1} · {frozen.phase}
+        {frozen.fen.split(' ')[5]} · {frozen.phase}
         <a href="#/game/{encodeURIComponent(frozen.gameId)}">open game</a>
       {/if}
       <span class="grow"></span>
