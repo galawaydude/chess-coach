@@ -10,6 +10,8 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "io.github.galawaydude.chesscoach"
     compileSdk = rootProject.ext.compileSdkVersion
+    // Match the build tools installed by the android-sdk-build-tools package.
+    buildToolsVersion = "37.0.0"
     defaultConfig {
         applicationId "io.github.galawaydude.chesscoach"
         minSdkVersion rootProject.ext.minSdkVersion

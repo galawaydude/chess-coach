@@ -27,3 +27,14 @@ allprojects {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+// Use the build tools installed on this machine (android-sdk-build-tools
+// package) for every module, including Capacitor's, instead of letting each
+// library ask for its own version to be downloaded.
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android.buildToolsVersion = "37.0.0"
+        }
+    }
+}

@@ -18,6 +18,8 @@ Then tell the build where the SDK is:
 echo "sdk.dir=/opt/android-sdk" > android/local.properties
 ```
 
+All modules are pinned to build-tools `37.0.0` (what the AUR package installs) in `android/build.gradle`, so Gradle never tries to download another version. If a Gradle download times out, retry with `GRADLE_OPTS="-Djava.net.preferIPv4Stack=true"`.
+
 ## 2. Upload key (once, keep it safe)
 
 Google Play signs the app it ships to users. You sign your uploads with an **upload key**:
@@ -28,7 +30,7 @@ keytool -genkeypair -v -keystore ~/.android-keys/chess-coach-upload.jks \
   -alias upload -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-Create `android/keystore.properties` (it's in `.gitignore`; never commit it):
+Already done on this machine: the key is `~/.android-keys/chess-coach-upload.jks`, its passwords are in `~/.android-keys/chess-coach-keystore.properties`, and `android/keystore.properties` is a symlink to that file. To set it up elsewhere, create `android/keystore.properties` (it's in `.gitignore`; never commit it):
 
 ```properties
 storeFile=/home/YOU/.android-keys/chess-coach-upload.jks
