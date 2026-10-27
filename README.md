@@ -35,6 +35,17 @@ Type your chess.com username on the Games page and hit **Load games**. Everythin
 
 `npm run build` produces a static site in `dist/`. Serve it with `npm run preview`, or any static host. To get the multi-threaded engine the host must send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`; without them it falls back to single-threaded, which still works.
 
+## Android
+
+Download the APK from [Releases](https://github.com/galawaydude/chess-coach/releases), or build it yourself (see [STORE.md](STORE.md)):
+
+```bash
+npm run android:apk       # debug APK
+npm run android:release   # signed release APK + AAB (needs the upload key)
+```
+
+Every push is built by GitHub Actions (debug APK as a build artifact). Pushing a tag like `v1.0.1` builds signed release files and attaches the APK to the GitHub release, once the signing secrets are set.
+
 ## How it's built
 
 - **Svelte 5 + TypeScript + Vite.** Small and fast, no virtual DOM.

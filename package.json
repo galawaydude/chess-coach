@@ -12,7 +12,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
     "android:sync": "npm run build && npx cap sync android",
     "android:bundle": "npm run android:sync && cd android && ./gradlew bundleRelease",
-    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug"
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug",
+    "android:release": "npm run android:sync && cd android && ./gradlew assembleRelease bundleRelease"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.3",

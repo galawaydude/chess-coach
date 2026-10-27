@@ -1,0 +1,95 @@
+name: Build
+
+# Every push and pull request: type-check, build the web app and a debug APK.
+# Tags like v1.2.3: build signed release APK + AAB and attach them to the
+# GitHub release (only when the signing secrets are set, see STORE.md).
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SIGNED: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Android SDK packages
+        # The project pins build-tools 37.0.0 for every module (android/build.gradle).
+        run: sdkmanager "platforms;android-36" "build-tools;37.0.0" > /dev/null
+
+      - run: npm ci
+
+      - name: Type-check
+        run: npm run check
+
+      - name: Build web app and sync into the Android project
+        run: npm run android:sync
+
+      - name: Debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chess-coach-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Signing key
+        if: env.SIGNED == 'true'
+        working-directory: android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          cat > keystore.properties <<EOF
+          storeFile=$RUNNER_TEMP/upload.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=upload
+          keyPassword=$KEYSTORE_PASSWORD
+          EOF
+
+      - name: Signed release APK and AAB
+        if: env.SIGNED == 'true'
+        working-directory: android
+        run: ./gradlew assembleRelease bundleRelease
+
+      - uses: actions/upload-artifact@v4
+        if: env.SIGNED == 'true'
+        with:
+          name: chess-coach-release
+          path: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Attach to the GitHub release
+        if: env.SIGNED == 'true' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk "chess-coach-$TAG.apk"
+          gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --title "Chess Coach $TAG" --generate-notes
+          gh release upload "$TAG" "chess-coach-$TAG.apk" --clobber
