@@ -17,6 +17,8 @@ const SINGLE = BASE + 'stockfish-19-lite-single.js'
 const MULTI = BASE + 'stockfish-19-lite.js'
 
 export const cores = Math.max(1, navigator.hardwareConcurrency || 4)
+const mobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)
+const lowMemory = ((navigator as { deviceMemory?: number }).deviceMemory ?? 8) <= 3
 export const threaded = typeof SharedArrayBuffer !== 'undefined' && self.crossOriginIsolated
 
 interface Job {
@@ -137,7 +139,8 @@ class Pool {
   private idle: Engine[] = []
   private waiters: ((e: Engine) => void)[] = []
   private timer: ReturnType<typeof setTimeout> | undefined
-  readonly size = Math.min(8, Math.max(1, cores - 1))
+  // Phones get fewer workers: each one holds its own copy of the engine in memory.
+  readonly size = Math.min(mobile ? Math.min(4, lowMemory ? 2 : 4) : 8, Math.max(1, cores - 1))
 
   private acquire(): Promise<Engine> {
     clearTimeout(this.timer)

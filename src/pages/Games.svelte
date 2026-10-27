@@ -149,12 +149,12 @@
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Type</th>
+                  <th class="wide">Type</th>
                   <th>Opponent</th>
                   <th>Result</th>
-                  <th class="num">Moves</th>
+                  <th class="num wide">Moves</th>
                   <th class="num">Accuracy</th>
-                  <th>Opening</th>
+                  <th class="wide">Opening</th>
                   <th></th>
                 </tr>
               </thead>
@@ -162,16 +162,16 @@
                 {#each shown as g (g.id)}
                   <tr class="click" onclick={() => go('/game/' + encodeURIComponent(g.id))}>
                     <td>{date(g.endTime)}</td>
-                    <td title={g.timeControl}>{TC[g.timeClass] ?? ''} {g.timeClass}</td>
+                    <td class="wide" title={g.timeControl}>{TC[g.timeClass] ?? ''} {g.timeClass}</td>
                     <td>
                       <span class="pc" title={g.userColor === 'w' ? 'You had White' : 'You had Black'}>{g.userColor === 'w' ? '□' : '■'}</span>
                       {them(g).username} <span class="muted">({them(g).rating})</span>
                     </td>
                     <td class={g.result === 'win' ? 'win-txt' : g.result === 'loss' ? 'loss-txt' : ''}>
                       {g.result === 'win' ? 'Won' : g.result === 'loss' ? 'Lost' : 'Draw'}
-                      <span class="muted" style="font-weight:normal">· {g.result === 'win' ? them(g).result : me(g).result}</span>
+                      <span class="muted wide" style="font-weight:normal">· {g.result === 'win' ? them(g).result : me(g).result}</span>
                     </td>
-                    <td class="num">{moveCount(g.pgn)}</td>
+                    <td class="num wide">{moveCount(g.pgn)}</td>
                     <td class="num">
                       {#if g.analysis}
                         <b>{acc(g, true)}</b> <span class="muted">/ {acc(g, false)}</span>
@@ -181,7 +181,7 @@
                         <span class="muted">queued</span>
                       {/if}
                     </td>
-                    <td class="opening" title={g.opening?.name ?? g.ecoName}>{g.opening?.name ?? g.ecoName ?? ''}</td>
+                    <td class="opening wide" title={g.opening?.name ?? g.ecoName}>{g.opening?.name ?? g.ecoName ?? ''}</td>
                     <td>
                       {#if !g.analysis && queue.current !== g.id && !queue.ids.includes(g.id)}
                         <button
@@ -234,6 +234,15 @@
   }
   .pc {
     font-size: 12px;
+  }
+  @media (max-width: 640px) {
+    .wide {
+      display: none;
+    }
+    .table :global(td) {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
   }
   input[type='text'] {
     width: 220px;

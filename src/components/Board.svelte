@@ -97,8 +97,34 @@
     aspect-ratio: 1;
     width: 100%;
   }
+  /* Coordinates inside the edge squares, sized to the board (chessground's
+     defaults are fixed pixels meant for outside the board). */
+  .board {
+    container-type: inline-size;
+  }
   .board :global(coords) {
     font-family: var(--font);
     font-weight: bold;
+    font-size: clamp(7px, 2.4cqw, 12px);
+  }
+  .board :global(coords.files) {
+    left: 0;
+    bottom: 0;
+    height: auto;
+  }
+  .board :global(coords.files coord) {
+    flex: 1 1 0;
+    text-align: right;
+    padding-right: 0.35em;
+  }
+  .board :global(coords.ranks) {
+    left: 0.3em;
+    top: 0;
+    width: auto;
+  }
+  .board :global(coords.ranks coord) {
+    flex: 1 1 0;
+    transform: none;
+    padding-top: 0.2em;
   }
 </style>

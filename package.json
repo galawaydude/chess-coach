@@ -1,7 +1,7 @@
 {
   "name": "chess-coach",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "predev": "node scripts/prepare.mjs",
@@ -9,9 +9,13 @@
     "prebuild": "node scripts/prepare.mjs",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:bundle": "npm run android:sync && cd android && ./gradlew bundleRelease",
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^24.19.2",
@@ -21,6 +25,9 @@
     "vite": "^8.3.4"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
     "chess.js": "^1.4.0",
     "chessground": "^9.2.1",
     "dexie": "^4.4.6",
