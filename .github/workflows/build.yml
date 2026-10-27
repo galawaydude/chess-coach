@@ -33,11 +33,10 @@ jobs:
           java-version: 21
           cache: gradle
 
-      - uses: android-actions/setup-android@v3
-
       - name: Android SDK packages
-        # The project pins build-tools 37.0.0 for every module (android/build.gradle).
-        run: sdkmanager "platforms;android-36" "build-tools;37.0.0" > /dev/null
+        # The runner image ships the Android SDK; add what this project pins
+        # (build-tools 37.0.0 for every module, see android/build.gradle).
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" "build-tools;37.0.0" > /dev/null
 
       - run: npm ci
 
