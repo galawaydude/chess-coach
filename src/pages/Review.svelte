@@ -315,6 +315,7 @@
                   </button>
                 {/if}
                 <button class="btn" onclick={() => go(`/play?fen=${encodeURIComponent(fen)}&color=${g.userColor}`)}>Play on from here</button>
+                <button class="btn" onclick={() => go(`/play?fen=${encodeURIComponent(fen)}&color=${g.userColor === 'w' ? 'b' : 'w'}`)}>Play as opponent</button>
                 <button class="btn" onclick={() => (ply = -1)}>Game report</button>
               </div>
             {/if}

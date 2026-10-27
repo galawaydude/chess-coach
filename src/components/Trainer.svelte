@@ -31,6 +31,12 @@
   }
   let { startFen, userColor, puzzle, onResolved, onNext, nextLabel = 'Next puzzle ▶' }: Props = $props()
 
+  // The side you're playing right now. You can switch sides in play mode and
+  // the engine takes over the other one.
+  // svelte-ignore state_referenced_locally
+  let side = $state<Color>(userColor)
+  let flipped = $state(false)
+
   const DEPTH = 14
 
   interface Node {
@@ -100,7 +106,7 @@
   evalOf(nodes[0])
   // Starting on the opponent's turn: let the engine make their move first.
   // svelte-ignore state_referenced_locally
-  if (!puzzle && new Chess(startFen).turn() !== userColor) engineReply(nodes[0])
+  if (!puzzle && new Chess(startFen).turn() !== side) engineReply(nodes[0])
 
   function addChild(parent: Node, uci: string, byEngine = false): Node {
     const existing = parent.children.map((i) => nodes[i]).find((c) => c.uci === uci)
@@ -116,8 +122,9 @@
   async function grade(parent: Node, child: Node) {
     const [pe, ce] = await Promise.all([evalOf(parent), evalOf(child)])
     const best = puzzle && parent.id === 0 ? puzzle.bestUci : pe.lines[0]?.pv[0]
-    const before = winFor(pe.lines[0].score, userColor)
-    const after = winFor(ce.lines[0].score, userColor)
+    const mover = new Chess(parent.fen).turn()
+    const before = winFor(pe.lines[0].score, mover)
+    const after = winFor(ce.lines[0].score, mover)
     const isBest = child.uci === best
     const drop = isBest ? 0 : Math.max(0, before - after)
     const cls: Cls = isBest ? 'best' : classify(drop)
@@ -236,7 +243,7 @@
     }
     const n = nodes[id]
     const c = new Chess(n.fen)
-    if (phase !== 'solve' && phase !== 'wrong' && c.turn() !== userColor && !n.children.length && n.uci) engineReply(n)
+    if (phase !== 'solve' && phase !== 'wrong' && c.turn() !== side && !n.children.length && n.uci) engineReply(n)
   }
 
   function back() {
@@ -245,9 +252,9 @@
     do {
       if (n.parent === null) break
       n = nodes[n.parent]
-    } while (new Chess(n.fen).turn() !== userColor)
+    } while (new Chess(n.fen).turn() !== side)
     // Started on the opponent's turn: land on their first move instead of the empty start.
-    if (new Chess(n.fen).turn() !== userColor && n.children.length) n = nodes[n.children[0]]
+    if (new Chess(n.fen).turn() !== side && n.children.length) n = nodes[n.children[0]]
     cur = n.id
     if (n.id === 0 && (phase === 'wrong' || phase === 'checking')) phase = 'solve'
   }
@@ -281,7 +288,7 @@
       }
       out.push(badge(node.uci, node.grade.cls))
     }
-    if (arrowPrefs.spoiler && !solving && !over && turn === userColor) out.push(...arrow(node.eval?.lines[0]?.pv[0], 'alt'))
+    if (arrowPrefs.spoiler && !solving && !over && turn === side) out.push(...arrow(node.eval?.lines[0]?.pv[0], 'alt'))
     return dedupe(out)
   })
   const legend = $derived([
@@ -291,7 +298,7 @@
   ])
 
   const canMove = $derived(
-    !over && turn === userColor && phase !== 'checking' && !(phase === 'wrong' && cur !== 0) && !(phase === 'solve' && cur !== 0),
+    !over && turn === side && phase !== 'checking' && !(phase === 'wrong' && cur !== 0) && !(phase === 'solve' && cur !== 0),
   )
 
   // ---- move tree as inline tokens: 12. Nf3 Nc6 (12... d5 13. exd5) 13. Bb5 ----
@@ -321,15 +328,21 @@
   }
   const toks = $derived(line(0, true))
 
-  const orientation = $derived(userColor === 'w' ? 'white' : 'black')
+  const orientation = $derived(((side === 'w') !== flipped ? 'white' : 'black') as 'white' | 'black')
+
+  function switchSides() {
+    side = side === 'w' ? 'b' : 'w'
+    flipped = false
+    if (!over && turn !== side && !node.children.length) engineReply(node)
+  }
   const feedback = $derived(lastUserNode?.grade)
   const status = $derived.by(() => {
     if (over) {
-      if (chess.isCheckmate()) return turn === userColor ? 'Checkmate. You lost this line.' : 'Checkmate! You won this line.'
+      if (chess.isCheckmate()) return turn === side ? 'Checkmate. You lost this line.' : 'Checkmate! You won this line.'
       return 'Draw.'
     }
     if (thinking || phase === 'checking') return 'Thinking…'
-    if (turn === userColor) return 'Your move.'
+    if (turn === side) return 'Your move.'
     return node.children.length ? 'Step forward or pick another move in the tree.' : 'Opponent to move…'
   })
 </script>
@@ -339,19 +352,23 @@
     <div class="title">
       <span>{puzzle && (phase === 'solve' || phase === 'wrong' || phase === 'checking') ? 'Find a better move' : 'Practice board'}</span>
       <span class="spacer"></span>
-      <span style="font-weight:normal">You play {userColor === 'w' ? 'White' : 'Black'}</span>
+      <span style="font-weight:normal">You play {side === 'w' ? 'White' : 'Black'}</span>
     </div>
     <div class="body">
       <div class="board-row">
-        <EvalBar score={phase === 'solve' || phase === 'wrong' ? undefined : node.eval?.lines[0]?.score} flipped={userColor === 'b'} />
+        <EvalBar score={phase === 'solve' || phase === 'wrong' ? undefined : node.eval?.lines[0]?.score} flipped={orientation === 'black'} />
         <div class="grow">
-          <Board fen={node.fen} {orientation} lastMove={node.uci} {shapes} movable={canMove ? orientation : undefined} {onMove} />
+          <Board fen={node.fen} {orientation} lastMove={node.uci} {shapes} movable={canMove ? (side === 'w' ? 'white' : 'black') : undefined} {onMove} />
         </div>
       </div>
       <div class="row controls">
         <button class="btn" onclick={back} disabled={cur === 0}>◀ Take back</button>
         <button class="btn" onclick={() => node.parent !== null && select(node.parent)} disabled={cur === 0}>◀</button>
         <button class="btn" onclick={() => node.children.length && select(node.children[0])} disabled={!node.children.length}>▶</button>
+        <button class="btn" onclick={() => (flipped = !flipped)} title="Flip the board">⇅</button>
+        {#if !solving}
+          <button class="btn" onclick={switchSides} title="Play the other side; the engine takes over yours">⇄ Switch sides</button>
+        {/if}
         <span class="grow"></span>
         <span class="muted">{status}</span>
       </div>
@@ -366,7 +383,7 @@
         {#if puzzle && (phase === 'solve' || (phase === 'checking' && !feedback))}
           <p class="big">
             {puzzle.cls === 'miss' ? 'You had a big chance here and missed it.' : 'You went wrong in this position.'}
-            What's the best move for {userColor === 'w' ? 'White' : 'Black'}?
+            What's the best move for {side === 'w' ? 'White' : 'Black'}?
           </p>
           {#if tries > 0}<p class="muted">Try {tries + 1}. Take your time: check every capture and every check first.</p>{/if}
           <div class="row">
@@ -379,7 +396,7 @@
           {#if hint === 2}<p class="muted">The arrow shows the move.</p>{/if}
         {:else if phase === 'wrong' && feedback}
           <p class="big bad">✗ Not quite.</p>
-          <div class="para"><ExplainText text={feedback.text} fen={nodes[lastUserNode!.parent!].fen} played={lastUserNode!.uci} me={userColor} /></div>
+          <div class="para"><ExplainText text={feedback.text} fen={nodes[lastUserNode!.parent!].fen} played={lastUserNode!.uci} me={side} /></div>
           <div class="row">
             <button class="btn primary" onclick={retry}>↺ Try again</button>
             <button class="btn" onclick={() => { retry(); hint = Math.min(2, hint + 1) }}>💡 Hint</button>
@@ -394,14 +411,14 @@
           {#if puzzle && nearStart && (phase === 'solved' || phase === 'revealed')}
             <div class="para muted">
               In the game you played <b>{puzzle.playedSan}</b>{#if puzzle.explanation}:
-                <ExplainText text={puzzle.explanation} fen={puzzle.fen} played={gamePlayed} me={userColor} />{:else}.{/if}
+                <ExplainText text={puzzle.explanation} fen={puzzle.fen} played={gamePlayed} me={side} />{:else}.{/if}
             </div>
           {/if}
           {#if feedback && !(puzzle && nearStart)}
             <div class="para">
               <span class="glyph" style:background={CLS_INFO[feedback.cls].color}>{CLS_INFO[feedback.cls].glyph}</span>
               <b>{lastUserNode?.san}</b>:
-              <ExplainText text={feedback.text} fen={nodes[lastUserNode!.parent!].fen} played={lastUserNode!.uci} me={userColor} />
+              <ExplainText text={feedback.text} fen={nodes[lastUserNode!.parent!].fen} played={lastUserNode!.uci} me={side} />
             </div>
           {:else if !feedback && !puzzle}
             <p>Play a move. The engine answers as your opponent and grades every move you make.</p>
@@ -434,7 +451,7 @@
         {/each}
       </div>
       {#if node.eval?.lines[0] && phase !== 'solve' && phase !== 'wrong' && !over}
-        <div class="pv muted">Engine: <ExplainText text={refLine('b', node.fen, node.eval.lines[0].pv, 6)} fen={node.fen} me={userColor} /></div>
+        <div class="pv muted">Engine: <ExplainText text={refLine('b', node.fen, node.eval.lines[0].pv, 6)} fen={node.fen} me={side} /></div>
       {/if}
     </section>
   </div>
