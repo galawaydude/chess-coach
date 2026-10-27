@@ -26,6 +26,33 @@ db.version(1).stores({
   meta: 'key',
 })
 
+// v2: game ids are per user. Before, a game between two players you both
+// loaded was stored once, under whoever was loaded first, and the other
+// player's list silently skipped it.
+db.version(2)
+  .stores({
+    games: 'id, user, endTime, [user+endTime]',
+    puzzles: 'id, user, gameId, due, [user+due]',
+    evals: 'key',
+    meta: 'key',
+  })
+  .upgrade(async (tx) => {
+    const games = await tx.table('games').toArray()
+    await tx.table('games').clear()
+    await tx.table('games').bulkAdd(games.map((g) => ({ ...g, id: `${g.user}:${g.id}` })))
+    const puzzles = await tx.table('puzzles').toArray()
+    await tx.table('puzzles').clear()
+    await tx.table('puzzles').bulkAdd(
+      puzzles.map((p) => {
+        const gameId = `${p.user}:${p.gameId}`
+        return { ...p, gameId, id: `${gameId}:${p.ply}` }
+      }),
+    )
+    // Re-download every month once so the games that were skipped come back.
+    const metas = await tx.table('meta').toArray()
+    await tx.table('meta').bulkDelete(metas.filter((m) => String(m.key).startsWith('archives:')).map((m) => m.key))
+  })
+
 /** Position key without move clocks so transpositions share a cache entry. */
 export function evalKey(fen: string) {
   return fen.split(' ').slice(0, 4).join(' ')

@@ -35,7 +35,8 @@ function toGame(raw: RawGame, user: string): Game | null {
   const result = me.result === 'win' ? 'win' : DRAWS.has(me.result) ? 'draw' : 'loss'
   const eco = raw.eco?.split('/openings/')[1]?.replace(/-/g, ' ').replace(/\s\d+\.+.*$/, '')
   return {
-    id: raw.uuid ?? raw.url,
+    // Per user: the same game shows up in both players' libraries.
+    id: `${user}:${raw.uuid ?? raw.url}`,
     url: raw.url,
     pgn: raw.pgn,
     endTime: raw.end_time * 1000,

@@ -87,7 +87,7 @@ export interface Player {
 }
 
 export interface Game {
-  id: string
+  id: string // `${user}:${chess.com game id}`
   url: string
   pgn: string
   endTime: number // ms
